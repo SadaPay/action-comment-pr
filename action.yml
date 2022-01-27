@@ -1,0 +1,55 @@
+name: Comment PR
+description: Add a comment to a PR, or update an existing one with the specified title
+inputs:
+  title:
+    description: Title of the comment, if a comment with this title is found it is going to be updated
+    required: true
+  body:
+    description: Body of the comment
+    required: true
+  github-token:
+    description: Token to access the GitHub APIs
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Get comment to update (if any)
+      id: check_comment
+      shell: bash
+      env:
+        AUTHOR: "github-actions[bot]"
+      run: |
+        PR_COMMENTS=$(curl --silent --show-error \
+          -H "Authorization: token ${{ inputs.github-token }}" \
+          -H "Accept: application/vnd.github.v3.diff" \
+          https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/${{ github.event.number }}/comments)
+
+        COMMENT_ID=$(printf "%s" "$PR_COMMENTS" | jq -r "[.[] | select(.user.login == \"${AUTHOR}\") | select(.body | startswith(\"## ${{ inputs.title }}\")) | .id] | first")
+        echo "Exsiting comment ID: ${COMMENT_ID}"
+        echo "::set-output name=comment_id::${COMMENT_ID}"
+
+    - name: Comment PR
+      shell: bash
+      run: |
+        COMMENT_ID=${{ steps.check_comment.outputs.comment_id }}
+        if [ "${COMMENT_ID}" = "null" ]; then
+          echo "Posting new comment"
+          API_PATH="issues/${{ github.event.number }}/comments"
+          OPERATION="POST"
+
+        else
+          echo "Updating comment: ${COMMENT_ID}"
+          API_PATH="issues/comments/${COMMENT_ID}"
+          OPERATION="PATCH"
+        fi
+
+        DATA=$(echo "${{ inputs.body }}" | jq -R --slurp "{body: (\"## ${{ inputs.title }}\n\n\" + .)}")
+
+        curl --silent --show-error \
+              -X ${OPERATION} \
+              -H "Accept: application/vnd.github.v3+json" \
+              -H "Authorization: token ${{ inputs.github-token }}" \
+              https://api.github.com/repos/${GITHUB_REPOSITORY}/${API_PATH} \
+              -d "$DATA"
