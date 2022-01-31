@@ -5,7 +5,7 @@ inputs:
     description: Title of the comment, if a comment with this title is found it is going to be updated
     required: true
   body:
-    description: Body of the comment
+    description: Body of the comment, it has to be wrapped between double quotes, i.e. "some body content"
     required: true
   github-token:
     description: Token to access the GitHub APIs
@@ -45,7 +45,8 @@ runs:
           OPERATION="PATCH"
         fi
 
-        DATA=$(echo "${{ inputs.body }}" | jq -R --slurp "{body: (\"## ${{ inputs.title }}\n\n\" + .)}")
+        DATA=$(printf '%s' '${{ inputs.body }}' | jq -rR --slurp '.')
+        DATA=$(printf '{"body":"## ${{ inputs.title }}\\\n\\\n%s"}' "${DATA}")
 
         curl --silent --show-error \
               -X ${OPERATION} \
