@@ -45,7 +45,7 @@ runs:
           OPERATION="PATCH"
         fi
 
-        DATA=$(echo "${{ inputs.body }}" | jq -R --slurp "{body: (\"## ${{ inputs.title }}\n\n\" + .)}")
+        DATA=$(printf "%s" "${{ inputs.body }}" | jq -R --slurp "{body: (\"## ${{ inputs.title }}\n\n\" + .)}")
 
         curl --silent --show-error \
               -X ${OPERATION} \
